@@ -12,9 +12,20 @@
         .input-block { display: flex; flex-direction: column; }
         .select-block { margin-bottom: 16px; }
         select, label { height: 52px; font-size: 14px; }
+        /* 追加されたスタイル */
+        .vertical-middle {
+          background: yellow; 
+          display: table-cell; 
+          vertical-align: middle; 
+        }
         .card { border-radius: 10px; overflow: hidden; }
         .list-group-item { border: none; padding: 8px 0; }
+        .fw-bold { letter-spacing: 0.05em; }
         code { background-color: #f1f1f1; padding: 2px 4px; border-radius: 4px; color: #d63384; }
+        /* 追加：リストの背景を透明にするための微調整 */
+        .list-group-item.bg-transparent {
+          background-color: transparent !important;
+        }
         #loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255,255,255,0.8); display: flex; justify-content: center;
@@ -62,28 +73,34 @@
     </div>
 
     <div class="card mt-5 shadow-sm">
-        <div class="card-header bg-success text-white"><h5>使い方 & Tips</h5></div>
-        <div class="card-body bg-light">
-            <div class="row">
-                <div class="col-md-6 border-end">
-                    <h6>操作ステップ</h6>
-                    <ol>
-                        <li>日数を入力（ホイールで7日ずつ）</li>
-                        <li>薬剤・針を選択</li>
-                        <li>処方本数を入力（針はホイールで14本ずつ）</li>
-                        <li>「計算してコピー」をクリック（またはEnter）</li>
-                    </ol>
-                </div>
-                <div class="col-md-6 ps-md-4">
-                    <h6>便利な機能</h6>
-                    <ul>
-                        <li>✅ <b>自動コピー</b>: ボタン押下で即クリップボードへ</li>
-                        <li>✅ <b>ホイール操作</b>: 各入力欄で増減可能</li>
-                        <li>✅ <b>キー移動</b>: 矢印キーでセル移動可能</li>
-                    </ul>
-                </div>
-            </div>
+      <div class="card-header bg-success text-white"><h5>使い方 & Tips</h5></div>
+      <div class="card-body bg-light">
+        <div class="row">
+          <div class="col-md-6 border-end">
+            <h6 class="fw-bold text-success border-bottom pb-2">操作ステップ</h6>
+            <ol class="list-group list-group-numbered list-group-flush">
+              <li class="list-group-item bg-transparent"><b>日数を入力</b>（デフォルト28日、ホイールで7日ずつ変化）</li>
+              <li class="list-group-item bg-transparent"><b>薬剤・針を選択</b>肢から選ぶ</li>
+              <li class="list-group-item bg-transparent"><b>処方本数を入力</b>（針はホイールで14本ずつ変化）</li>
+              <li class="list-group-item bg-transparent"><b>1回使用量を入力</b><br>
+                <small class="text-muted">※1日3回なら分1〜分3に入力。マンジャロ等は入力不要です。</small>
+              </li>
+              <li class="list-group-item bg-transparent"><b>「計算してコピー」</b>をクリックまたはエンターキー</li>
+            </ol>
+          </div>
+          <div class="col-md-6 ps-md-4">
+            <h6 class="fw-bold text-secondary border-bottom pb-2">便利な機能</h6>
+            <ul class="list-unstyled mt-2">
+              <li class="mb-2">✅ <b>空打ち分</b>は自動計算に含まれています。</li>
+              <li class="mb-2">✅ ボタン押下時に<b>クリップボードへ自動コピー</b>されるので、そのまま薬歴に <code>Ctrl + V</code> で貼り付けOK！</li>
+              <li class="mb-2">⌨️ <b>矢印キー（↑↓←→）</b>でExcelのようにセル移動が可能です。</li>
+              <li class="mb-2">⚠️ 不足がある場合は<b>赤字</b>で表示されます。残薬確認をお願いします。</li>
+              <li class="mb-2">🖱️ 各入力欄はマウスを合わせるだけで<b>ホイール操作</b>が可能です。</li>
+              <li class="mb-2">🗓️ 次回予定日は、本日の日付を基準に算出されます。</li>
+            </ul>
+          </div>
         </div>
+      </div>
     </div>
 </div>
 
