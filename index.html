@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>単位計算ツール</title>
-
-    <link rel="icon" type="image/png" href="icon.png">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <style>
         .input-block { display: flex; flex-direction: column; }
         .select-block { margin-bottom: 16px; }
@@ -90,27 +86,34 @@
 
 <script>
     // ★重要：ここにGASのデプロイURLを貼り付けてください
-    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwMovwSl56XYg6k4XR46F5_Xw9nBz5X7JF0n3-iyjGC5joJW8qADnjkvzqVdeEYXzR0Sg/exec';
+    const GAS_API_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
     
     let masterData = [];
 
     // 1. 起動時にデータを取得
     window.addEventListener('load', async () => {
         try {
-            const response = await fetch(GAS_API_URL);
+            // ★修正ポイント：redirect: 'follow' を追加
+            const response = await fetch(GAS_API_URL, {
+                method: 'GET',
+                redirect: 'follow'
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+            
             const data = await response.json();
             
             // アイウエオ順にソート（名称は0番目）
             data.sort((a, b) => a[0].localeCompare(b[0], 'ja'));
             masterData = data;
 
-            buildTable(); // テーブル構造を作成
-            buildDropdowns(data); // プルダウンに薬剤をセット
+            buildTable(); 
+            buildDropdowns(data); 
             
             document.getElementById('loading-overlay').style.display = 'none';
         } catch (e) {
-            console.error(e);
-            document.getElementById('loading-overlay').innerText = 'データ読み込み失敗。URLを確認してください。';
+            console.error('Fetch Error:', e);
+            document.getElementById('loading-overlay').innerText = 'データ読み込み失敗。GASの「デプロイ設定」が「全員」になっているか確認してください。';
         }
     });
 
@@ -158,7 +161,6 @@
         let needleTotal = 0;
         let hasNeedle = false;
         let needleStock = 0;
-        let needsWeeklyDisplay = false;
 
         const masterNames = masterData.map(d => d[0]);
 
@@ -184,15 +186,8 @@
             const capacity = row[1], unit = row[2], needNeedle = row[3], interval = row[4], priming = Number(row[5]);
 
             let useCount = [s1, s2, s3, s4].filter(v => v > 0).length;
-            let days = 0;
-            let intervalLabel = "";
-
-            if (interval === "毎日") {
-                days = nissuu; intervalLabel = "日分";
-            } else if (interval === "週1") {
-                days = Math.ceil(nissuu / 7); intervalLabel = "週分";
-                needsWeeklyDisplay = true;
-            }
+            let days = (interval === "週1") ? Math.ceil(nissuu / 7) : nissuu;
+            let intervalLabel = (interval === "週1") ? "週分" : "日分";
 
             if (needNeedle === "要") needleTotal += (useCount * days);
 
@@ -213,7 +208,6 @@
             }
         }
 
-        // 針の計算
         if (needleTotal > 0 || hasNeedle) {
             let diffN = needleStock - needleTotal;
             let colorN = diffN < 0 ? "red" : "black";
@@ -228,23 +222,19 @@
             clipText += `\n${needleText}`;
         }
 
-        // 日付計算
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + nissuu);
         const dateStr = `${targetDate.getMonth()+1}月${targetDate.getDate()}日(${"日月火水木金土"[targetDate.getDay()]})`;
         
-        let footer = `\n次回予定日:${dateStr}`;
         htmlResult += `<div>次回予定日:${dateStr}</div>`;
-        clipText += footer;
+        clipText += `\n次回予定日:${dateStr}`;
 
         document.getElementById('dayresult').innerHTML = htmlResult;
         navigator.clipboard.writeText(clipText.trim());
     }
 
-    /* --- 便利機能（キー操作・ホイール） --- */
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') calcBtn();
-        // 矢印キー移動ロジックは以前のものをここに統合可能（長くなるため省略、必要なら追加してください）
     });
 
     document.addEventListener('wheel', (e) => {
