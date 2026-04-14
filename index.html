@@ -88,36 +88,46 @@
 </div>
 
 <script>
-    // ★重要：ここにGASのデプロイURLを貼り付けてください
-    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyXERYhDywRt6iPBbzCR65hYHo9rEBeDYo7hMNiP1OqTN-ec0Aj-m4T1VEsherFAJohOw/exec';
+    let masterData = [["ゾルトファイ",300,"単位","要","毎日",2],
+                      ["ソリクア",300,"単位","要","毎日",2],
+                      ["ビクトーザ",18,"mg","要","毎日",0.12],
+                      ["バイエッタ",300,"単位","要","毎日",2],
+                      ["リキスミア",300,"単位","要","毎日",2],
+                      ["トルリシティ",1,"キット","不要","週1",0],
+                      ["オゼンピック",2,"mg","要","週1",0],
+                      ["ノボリンＲ",300,"単位","要","毎日",2],
+                      ["ヒューマリンＲ",300,"単位","要","毎日",2],
+                      ["ノボリンＮ",300,"単位","要","毎日",2],
+                      ["ヒューマリンＮ",300,"単位","要","毎日",2],
+                      ["ノボリン30Ｒ",300,"単位","要","毎日",2],
+                      ["ヒューマログ",300,"単位","要","毎日",2],
+                      ["ルムジェブ",300,"単位","要","毎日",2],
+                      ["インスリンリスプロ",300,"単位","要","毎日",2],
+                      ["インスリンアスパルト",300,"単位","要","毎日",2],
+                      ["ノボラピッド",300,"単位","要","毎日",2],
+                      ["ノボラピッド30Ｒ",300,"単位","要","毎日",2],
+                      ["フィアスプ",300,"単位","要","毎日",2],
+                      ["アピドラ",300,"単位","要","毎日",2],
+                      ["ランタス",300,"単位","要","毎日",2],
+                      ["ランタスXR",450,"単位","要","毎日",3],
+                      ["グラルギン",300,"単位","要","毎日",2],
+                      ["レベミル",300,"単位","要","毎日",2],
+                      ["トレシーバ",300,"単位","要","毎日",2],
+                      ["ライゾデグ",300,"単位","要","毎日",2],
+                      ["アウィクリ(300)",300,"単位","要","週1",10],
+                      ["アウィクリ(700)",700,"単位","要","週1",10],
+                      ["マンジャロ",1,"キット","不要","週1",0],
+                      ["ソグルーヤ",5,"mg","要","週1",0.025]];
+
+    window.addEventListener('load', () => {
+        // 通信(fetch)をせず、変数にあるデータをそのまま使う
+        masterData.sort((a, b) => a[0].localeCompare(b[0], 'ja'));
     
-    let masterData = [];
-
-    // 1. 起動時にデータを取得
-    window.addEventListener('load', async () => {
-        try {
-            // ★修正ポイント：redirect: 'follow' を追加
-            const response = await fetch(GAS_API_URL, {
-                method: 'GET',
-                redirect: 'follow'
-            });
-
-            if (!response.ok) throw new Error('Network response was not ok');
-            
-            const data = await response.json();
-            
-            // アイウエオ順にソート（名称は0番目）
-            data.sort((a, b) => a[0].localeCompare(b[0], 'ja'));
-            masterData = data;
-
-            buildTable(); 
-            buildDropdowns(data); 
-            
-            document.getElementById('loading-overlay').style.display = 'none';
-        } catch (e) {
-            console.error('Fetch Error:', e);
-            document.getElementById('loading-overlay').innerText = 'データ読み込み失敗。GASの「デプロイ設定」が「全員」になっているか確認してください。';
-        }
+        buildTable(); 
+        buildDropdowns(masterData); 
+        
+        // ローディング画面を一瞬で消す
+        document.getElementById('loading-overlay').style.display = 'none';
     });
 
     // テーブルの行を動的に生成
