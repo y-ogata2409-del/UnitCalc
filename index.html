@@ -31,6 +31,28 @@
             background: rgba(255,255,255,0.8); display: flex; justify-content: center;
             align-items: center; z-index: 1000; font-weight: bold;
         }
+/* コピー通知のスタイル */
+#copy-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    z-index: 2000;
+    display: block; /* 最初からblockにしておき、opacityで制御します */
+    pointer-events: none; /* 背後のボタン操作を邪魔しないように追加 */
+    opacity: 0;
+    transition: opacity 1.0s ease;
+}
+
+/* アニメーション用クラス */
+.show-toast {
+    display: block !important;
+    opacity: 1 !important;
+}
     </style>
 </head>
 <body>
@@ -38,7 +60,7 @@
 <div id="loading-overlay">データを読み込み中...</div>
 
 <div class="container" style="max-width: 1000px;">
-    <h2 class="my-4">★単位計算</h2>
+    <h2 class="my-4">★単位計算</h2> <div id="copy-toast">結果をクリップボードにコピーされました</div>
     
     <table class="table">
         <thead>
@@ -154,19 +176,45 @@
         let html = "";
 
         labels.forEach((label, i) => {
-            html += `<tr style="text-align: center;" class="${classes[i]}">`;
+            // 行を特定するためのIDを付与。分3(i=3)以降は最初は隠す。
+            let rowStyle = (i >= 4) ? 'style="display: none;"' : '';
+            let rowId = `id="row-shiyou${i-1}"`; 
+            if (i === 0) rowId = `id="row-meisyo"`;
+            if (i === 1) rowId = `id="row-suuryou"`;
+
+            html += `<tr ${rowId} ${rowStyle} style="text-align: center;" class="${classes[i]}">`;
             html += `<td style="width: 100px" class="align-middle">${label}</td>`;
             for (let l = 1; l <= 5; l++) {
                 if (i === 0) {
                     html += `<td style="width: 200px"><select class="form-select" id="kusuriselect${l}"><option>---</option></select></td>`;
                 } else {
                     const id = i === 1 ? `suuryou${l}` : `siyouryou${i-1}-${l}`;
-                    html += `<td style="width: 200px"><input type="number" min="0" class="form-control" id="${id}" value="0" onfocus="this.select();"></td>`;
+                    // inputに oninput="checkNextRow()" を追加して入力検知
+                    html += `<td style="width: 200px"><input type="number" min="0" class="form-control" id="${id}" value="0" onfocus="this.select();" oninput="checkNextRow()"></td>`;
                 }
             }
             html += `</tr>`;
         });
         document.getElementById('table-body').innerHTML = html;
+    }
+
+	// 入力状況に応じて次の行を表示する
+    function checkNextRow() {
+        // 分2(row-shiyou2)のいずれかに0以外が入ったら、分3を表示
+        for (let l = 1; l <= 5; l++) {
+            if (Number(document.getElementById(`siyouryou2-${l}`).value) > 0) {
+                document.getElementById('row-shiyou3').style.display = '';
+                break;
+            }
+        }
+        // 分3(row-shiyou3)のいずれかに0以外が入ったら、分4を表示
+        for (let l = 1; l <= 5; l++) {
+            const row3 = document.getElementById(`siyouryou3-${l}`);
+            if (row3 && Number(row3.value) > 0) {
+                document.getElementById('row-shiyou4').style.display = '';
+                break;
+            }
+        }
     }
 
     function buildDropdowns(data) {
@@ -221,32 +269,59 @@
 
             if (needNeedle === "要") needleTotal += (useCount * days);
 
+            // --- インスリンの計算部分 ---
             let required = days * (s1 + s2 + s3 + s4 + priming * useCount);
             let totalPrescribed = suuryou * capacity;
             let diff = totalPrescribed - required;
             let color = diff < 0 ? "red" : "black";
-            let status = diff < 0 ? `${Math.abs(diff)}${unit}(${Math.abs(diff/capacity).toFixed(2)}本)不足${zann}` : "不足なし";
+
+            // 元の表記「〇〇単位(〇〇本)不足」を再現
+            let busokuDetail = diff < 0 ? `${Math.abs(diff)}${unit}(${Math.abs(diff/capacity).toFixed(2)}本)不足${zann}` : "不足なし";
 
             if (syosiki === "出力形式1") {
-                let rowText = `${kusuri}:${diff < 0 ? Math.abs(diff/capacity).toFixed(2)+'本不足' : '不足なし'} (必要:${required}${unit} / 処方:${totalPrescribed}${unit})`;
+                // 形式1: インスリン名:〇〇単位(〇〇本)不足...
+                let rowText = `${kusuri}:${busokuDetail} (必要:${required}${unit} / 処方:${totalPrescribed}${unit})`;
                 htmlResult += `<div style="color:${color}">${rowText}</div>`;
                 clipText += `\n${rowText}`;
             } else {
-                let rowText = `${kusuri}必要量${required}${unit}(${days}${intervalLabel}) 今回処方${totalPrescribed}${unit}→${status}`;
+                // 形式2: インスリン名 必要量... → 〇〇単位(〇〇本)不足...
+                let rowText = `${kusuri}必要量${required}${unit}(${days}${intervalLabel}) 今回処方${totalPrescribed}${unit}→${busokuDetail}`;
                 htmlResult += `<div style="color:${color}">${rowText}</div>`;
                 clipText += `\n${rowText}`;
             }
         }
 
+        // --- 針の計算部分 ---
         if (needleTotal > 0 || hasNeedle) {
             let diffN = needleStock - needleTotal;
             let colorN = diffN < 0 ? "red" : "black";
-            let fukuro = Math.abs(diffN / 14).toFixed(1);
-            let statusN = diffN < 0 ? `${Math.abs(diffN)}本(${fukuro}袋)不足${zann}` : "不足なし";
             
-            let needleText = syosiki === "出力形式1" 
-                ? `針:${diffN < 0 ? Math.abs(diffN)+'本不足' : '不足なし'} (必要:${needleTotal}本 / 処方:${needleStock}本)`
-                : `針必要本数${needleTotal}本(${nissuu}日分) 今回処方${needleStock}本→${statusN}`;
+            // 袋数と箱数の計算
+            let totalFukuro = Math.abs(diffN / 14);
+            let hako = Math.floor(totalFukuro / 5); // 5袋で1箱
+            let fukuroVal = totalFukuro % 5;        // 余った袋数
+            
+            // 小数点第1位までにしつつ、不要な .0 を消す処理
+            let fukuro = Math.round(fukuroVal * 10) / 10;
+
+            // 表記の組み立て
+            let unitText = "";
+            if (hako > 0) {
+                unitText = `${hako}箱`;
+                if (fukuro > 0) unitText += ` + ${fukuro}袋`;
+            } else {
+                unitText = `${fukuro}袋`;
+            }
+
+            // 元の表記「〇〇本(〇箱 + 〇袋)不足」を再現
+            let busokuNeedleDetail = diffN < 0 ? `${Math.abs(diffN)}本(${unitText})不足${zann}` : "不足なし";
+            
+            let needleText = "";
+            if (syosiki === "出力形式1") {
+                needleText = `針:${busokuNeedleDetail} (必要:${needleTotal}本 / 処方:${needleStock}本)`;
+            } else {
+                needleText = `針必要本数${needleTotal}本(${nissuu}日分) 今回処方${needleStock}本→${busokuNeedleDetail}`;
+            }
             
             htmlResult += `<div style="color:${colorN}">${needleText}</div>`;
             clipText += `\n${needleText}`;
@@ -260,7 +335,20 @@
         clipText += `\n次回予定日:${dateStr}`;
 
         document.getElementById('dayresult').innerHTML = htmlResult;
-        navigator.clipboard.writeText(clipText.trim());
+	// クリップボードにコピー
+        navigator.clipboard.writeText(clipText.trim()).then(() => {
+            // ★コピー成功時にアニメーションを表示
+            const toast = document.getElementById('copy-toast');
+            toast.classList.add('show-toast');
+
+            // 1.2秒後に消す
+            setTimeout(() => {
+                toast.classList.remove('show-toast');
+            }, 1200);
+        });
+
+        // 結果表示を更新
+        document.getElementById('dayresult').innerHTML = htmlResult;
     }
 
     /* --- 便利機能（キー操作・ホイール） --- */
