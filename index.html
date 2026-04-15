@@ -215,28 +215,35 @@
         document.getElementById('loading-overlay').style.display = 'none';
     });
 
-    // テーブルの行を動的に生成
+    /// テーブルの行を動的に生成
     function buildTable() {
-        const labels = ["名称", "処方本数", "分1", "分2", "分3", "分4"];
-        const classes = ["table-warning", "table-primary", "table-success", "table-success", "table-success", "table-success"];
+        const labels = ["名称", "処方本数", "分1", "分2", "分3", "分4", "分5"];
+        const classes = ["table-warning", "table-primary", "table-success", "table-success", "table-success", "table-success", "table-success"];
         let html = "";
 
         labels.forEach((label, i) => {
-            // 行を特定するためのIDを付与。分3(i=3)以降は最初は隠す。
-            let rowStyle = (i >= 4) ? 'style="display: none;"' : '';
-            let rowId = `id="row-shiyou${i-1}"`; 
-            if (i === 0) rowId = `id="row-meisyo"`;
-            if (i === 1) rowId = `id="row-suuryou"`;
+            // i=3は「分2」。i=4(分3)以降を初期状態で隠す
+            let isHidden = i >= 4;
+            let rowStyle = isHidden ? 'style="display: none; text-align: center;"' : 'style="text-align: center;"';
+            
+            // IDの割り振り（名称:row-meisyo, 処方:row-suuryou, 分1:row-shiyou1 ... 分5:row-shiyou5）
+            let rowId = "";
+            if (i === 0) rowId = 'id="row-meisyo"';
+            else if (i === 1) rowId = 'id="row-suuryou"';
+            else rowId = `id="row-shiyou${i-1}"`;
 
-            html += `<tr ${rowId} ${rowStyle} style="text-align: center;" class="${classes[i]}">`;
+            html += `<tr ${rowId} ${rowStyle} class="${classes[i]}">`;
             html += `<td style="width: 100px" class="align-middle">${label}</td>`;
             for (let l = 1; l <= 5; l++) {
                 if (i === 0) {
                     html += `<td style="width: 200px"><select class="form-select" id="kusuriselect${l}"><option>---</option></select></td>`;
                 } else {
                     const id = i === 1 ? `suuryou${l}` : `siyouryou${i-1}-${l}`;
-                    // inputに oninput="checkNextRow()" を追加して入力検知
-                    html += `<td style="width: 200px"><input type="number" min="0" class="form-control" id="${id}" value="0" onfocus="this.select();" oninput="checkNextRow()"></td>`;
+                    // 中央揃えをtdに適用
+                    html += `<td style="width: 200px; text-align: center;">
+                                <input type="number" min="0" class="form-control" id="${id}" value="0" 
+                                 onfocus="this.select();" oninput="checkNextRow()">
+                             </td>`;
                 }
             }
             html += `</tr>`;
@@ -244,21 +251,22 @@
         document.getElementById('table-body').innerHTML = html;
     }
 
-	// 入力状況に応じて次の行を表示する
+	// 次の行を表示するロジック
     function checkNextRow() {
-        // 分2(row-shiyou2)のいずれかに0以外が入ったら、分3を表示
-        for (let l = 1; l <= 5; l++) {
-            if (Number(document.getElementById(`siyouryou2-${l}`).value) > 0) {
-                document.getElementById('row-shiyou3').style.display = '';
-                break;
+        // 2(分2)〜4(分4)の入力をチェックして、次の行(3〜5)を出す
+        for (let i = 2; i <= 4; i++) {
+            let hasValue = false;
+            for (let l = 1; l <= 5; l++) {
+                const input = document.getElementById(`siyouryou${i}-${l}`);
+                if (input && Number(input.value) > 0) {
+                    hasValue = true;
+                    break;
+                }
             }
-        }
-        // 分3(row-shiyou3)のいずれかに0以外が入ったら、分4を表示
-        for (let l = 1; l <= 5; l++) {
-            const row3 = document.getElementById(`siyouryou3-${l}`);
-            if (row3 && Number(row3.value) > 0) {
-                document.getElementById('row-shiyou4').style.display = '';
-                break;
+            // 値があれば次の行を表示
+            const nextRow = document.getElementById(`row-shiyou${i + 1}`);
+            if (nextRow && hasValue) {
+                nextRow.style.display = '';
             }
         }
     }
@@ -275,127 +283,117 @@
     }
 
     /* --- 計算ロジック --- */
-    function calcBtn() {
-        const nissuu = Number(document.getElementById("nissuu").value);
-        const syosiki = document.getElementById('syosiki').value;
-        const zann = document.getElementById('zan').checked ? "だが残あり" : "";
+function calcBtn() {
+    const nissuu = Number(document.getElementById("nissuu").value);
+    const syosiki = document.getElementById('syosiki').value;
+    const zann = document.getElementById('zan').checked ? "だが残あり" : "";
+    
+    let htmlResult = "";
+    let clipText = "";
+    let needleTotal = 0;
+    let hasNeedle = false;
+    let needleStock = 0;
+
+    const masterNames = masterData.map(d => d[0]);
+
+    // 1. 各列(薬品ごと)のループ
+    for (let l = 1; l <= 5; l++) {
+        const kusuri = document.getElementById(`kusuriselect${l}`).value;
+        if (kusuri === "------" || kusuri === "---") continue;
         
-        let htmlResult = "";
-        let clipText = "";
-        let needleTotal = 0;
-        let hasNeedle = false;
-        let needleStock = 0;
-
-        const masterNames = masterData.map(d => d[0]);
-
-        for (let l = 1; l <= 5; l++) {
-            const kusuri = document.getElementById(`kusuriselect${l}`).value;
-            if (kusuri === "------") continue;
-            if (kusuri === "針") {
-                hasNeedle = true;
-                needleStock = Number(document.getElementById(`suuryou${l}`).value);
-                continue;
-            }
-
-            const suuryou = Number(document.getElementById(`suuryou${l}`).value);
-            const s1 = Number(document.getElementById(`siyouryou1-${l}`).value);
-            const s2 = Number(document.getElementById(`siyouryou2-${l}`).value);
-            const s3 = Number(document.getElementById(`siyouryou3-${l}`).value);
-            const s4 = Number(document.getElementById(`siyouryou4-${l}`).value);
-
-            const idx = masterNames.indexOf(kusuri);
-            if (idx === -1) continue;
-
-            const row = masterData[idx];
-            const capacity = row[1], unit = row[2], needNeedle = row[3], interval = row[4], priming = Number(row[5]);
-
-            let useCount = [s1, s2, s3, s4].filter(v => v > 0).length;
-            let days = (interval === "週1") ? Math.ceil(nissuu / 7) : nissuu;
-            let intervalLabel = (interval === "週1") ? "週分" : "日分";
-
-            if (needNeedle === "要") needleTotal += (useCount * days);
-
-            // --- インスリンの計算部分 ---
-            let required = days * (s1 + s2 + s3 + s4 + priming * useCount);
-            let totalPrescribed = suuryou * capacity;
-            let diff = totalPrescribed - required;
-            let color = diff < 0 ? "red" : "black";
-
-            // 元の表記「〇〇単位(〇〇本)不足」を再現
-            let busokuDetail = diff < 0 ? `${Math.abs(diff)}${unit}(${Math.abs(diff/capacity).toFixed(2)}本)不足${zann}` : "不足なし";
-
-            if (syosiki === "出力形式1") {
-                // 形式1: インスリン名:〇〇単位(〇〇本)不足...
-                let rowText = `${kusuri}:${busokuDetail} (必要:${required}${unit} / 処方:${totalPrescribed}${unit})`;
-                htmlResult += `<div style="color:${color}">${rowText}</div>`;
-                clipText += `\n${rowText}`;
-            } else {
-                // 形式2: インスリン名 必要量... → 〇〇単位(〇〇本)不足...
-                let rowText = `${kusuri}必要量${required}${unit}(${days}${intervalLabel}) 今回処方${totalPrescribed}${unit}→${busokuDetail}`;
-                htmlResult += `<div style="color:${color}">${rowText}</div>`;
-                clipText += `\n${rowText}`;
-            }
+        // 針の在庫チェック
+        if (kusuri === "針") {
+            hasNeedle = true;
+            needleStock = Number(document.getElementById(`suuryou${l}`).value);
+            continue;
         }
 
-        // --- 針の計算部分 ---
-        if (needleTotal > 0 || hasNeedle) {
-            let diffN = needleStock - needleTotal;
-            let colorN = diffN < 0 ? "red" : "black";
-            
-            // 袋数と箱数の計算
-            let totalFukuro = Math.abs(diffN / 14);
-            let hako = Math.floor(totalFukuro / 5); // 5袋で1箱
-            let fukuroVal = totalFukuro % 5;        // 余った袋数
-            
-            // 小数点第1位までにしつつ、不要な .0 を消す処理
-            let fukuro = Math.round(fukuroVal * 10) / 10;
+        const suuryou = Number(document.getElementById(`suuryou${l}`).value);
 
-            // 表記の組み立て
-            let unitText = "";
-            if (hako > 0) {
-                unitText = `${hako}箱`;
-                if (fukuro > 0) unitText += ` + ${fukuro}袋`;
-            } else {
-                unitText = `${fukuro}袋`;
-            }
-
-            // 元の表記「〇〇本(〇箱 + 〇袋)不足」を再現
-            let busokuNeedleDetail = diffN < 0 ? `${Math.abs(diffN)}本(${unitText})不足${zann}` : "不足なし";
-            
-            let needleText = "";
-            if (syosiki === "出力形式1") {
-                needleText = `針:${busokuNeedleDetail} (必要:${needleTotal}本 / 処方:${needleStock}本)`;
-            } else {
-                needleText = `針必要本数${needleTotal}本(${nissuu}日分) 今回処方${needleStock}本→${busokuNeedleDetail}`;
-            }
-            
-            htmlResult += `<div style="color:${colorN}">${needleText}</div>`;
-            clipText += `\n${needleText}`;
+        // 分1～分5の使用量を配列で一括取得
+        let usages = [];
+        for (let j = 1; j <= 5; j++) {
+            usages.push(Number(document.getElementById(`siyouryou${j}-${l}`).value) || 0);
         }
-
-        const targetDate = new Date();
-        targetDate.setDate(targetDate.getDate() + nissuu);
-        const dateStr = `${targetDate.getMonth()+1}月${targetDate.getDate()}日(${"日月火水木金土"[targetDate.getDay()]})`;
         
-        htmlResult += `<div>次回予定日:${dateStr}</div>`;
-        clipText += `\n次回予定日:${dateStr}`;
+        const sTotal = usages.reduce((sum, val) => sum + val, 0); // 合計単位数
+        const useCount = usages.filter(v => v > 0).length;         // 使用回数
 
-        document.getElementById('dayresult').innerHTML = htmlResult;
-	// クリップボードにコピー
-        navigator.clipboard.writeText(clipText.trim()).then(() => {
-            // ★コピー成功時にアニメーションを表示
-            const toast = document.getElementById('copy-toast');
-            toast.classList.add('show-toast');
+        const idx = masterNames.indexOf(kusuri);
+        if (idx === -1) continue;
 
-            // 1.2秒後に消す
-            setTimeout(() => {
-                toast.classList.remove('show-toast');
-            }, 1200);
-        });
+        const row = masterData[idx];
+        const capacity = row[1], unit = row[2], needNeedle = row[3], interval = row[4], priming = Number(row[5]);
 
-        // 結果表示を更新
-        document.getElementById('dayresult').innerHTML = htmlResult;
+        let days = (interval === "週1") ? Math.ceil(nissuu / 7) : nissuu;
+        let intervalLabel = (interval === "週1") ? "週分" : "日分";
+
+        // 針が必要な薬ならカウントに加算
+        if (needNeedle === "要") needleTotal += (useCount * days);
+
+        // インスリンの必要量計算
+        let required = days * (sTotal + (priming * useCount));
+        let totalPrescribed = suuryou * capacity;
+        let diff = totalPrescribed - required;
+        let color = diff < 0 ? "red" : "black";
+
+        // 不足分の表示作成
+        let busokuDetail = diff < 0 ? `${Math.abs(diff)}${unit}(${Number((Math.abs(diff/capacity)).toFixed(2))}本)不足${zann}` : "不足なし";
+
+        let rowText = "";
+        if (syosiki === "出力形式1") {
+            rowText = `${kusuri}:${busokuDetail} (必要:${required}${unit} / 処方:${totalPrescribed}${unit})`;
+        } else {
+            rowText = `${kusuri}必要量${required}${unit}(${days}${intervalLabel}) 今回処方${totalPrescribed}${unit}→${busokuDetail}`;
+        }
+        htmlResult += `<div style="color:${color}">${rowText}</div>`;
+        clipText += `\n${rowText}`;
     }
+
+    // 2. 針の不足分計算
+    if (needleTotal > 0 || hasNeedle) {
+        let diffN = needleStock - needleTotal;
+        let colorN = diffN < 0 ? "red" : "black";
+        
+        let totalFukuro = Math.abs(diffN / 14);
+        let hako = Math.floor(totalFukuro / 5);
+        let fukuroVal = totalFukuro % 5;
+        let fukuro = Math.round(fukuroVal * 10) / 10; // 割り切れる時は小数点を消す
+
+        let unitText = hako > 0 ? `${hako}箱` + (fukuro > 0 ? ` + ${fukuro}袋` : "") : `${fukuro}袋`;
+        let busokuNeedleDetail = diffN < 0 ? `${Math.abs(diffN)}本(${unitText})不足${zann}` : "不足なし";
+        
+        let needleText = "";
+        if (syosiki === "出力形式1") {
+            needleText = `針:${busokuNeedleDetail} (必要:${needleTotal}本 / 処方:${needleStock}本)`;
+        } else {
+            needleText = `針必要本数${needleTotal}本(${nissuu}日分) 今回処方${needleStock}本→${busokuNeedleDetail}`;
+        }
+        htmlResult += `<div style="color:${colorN}">${needleText}</div>`;
+        clipText += `\n${needleText}`;
+    }
+
+    // 3. 次回予定日の計算
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + nissuu);
+    const dateStr = `${targetDate.getMonth()+1}月${targetDate.getDate()}日(${"日月火水木金土"[targetDate.getDay()]})`;
+    htmlResult += `<div>次回予定日:${dateStr}</div>`;
+    clipText += `\n次回予定日:${dateStr}`;
+
+    // 4. 結果の出力とコピー
+    document.getElementById('dayresult').innerHTML = htmlResult;
+    
+    navigator.clipboard.writeText(clipText.trim()).then(() => {
+        const toast = document.getElementById('copy-toast');
+        toast.classList.add('show-toast');
+        setTimeout(() => { toast.classList.remove('show-toast'); }, 1200);
+    });
+
+    // 5. GA4にイベント送信（解析用）
+    if (typeof gtag === 'function') {
+        gtag('event', 'calculation_execute', { 'event_category': 'usage' });
+    }
+}
 
     /* --- 便利機能（キー操作・ホイール） --- */
     document.addEventListener('keydown', (e) => {
@@ -475,10 +473,15 @@
         let step = target.id === 'nissuu' ? 7 : 1;
         if (target.id.startsWith('suuryou')) {
             const l = target.id.replace('suuryou', '');
-            if (document.getElementById(`kusuriselect${l}`).value === '針') step = 14;
+            const sel = document.getElementById(`kusuriselect${l}`);
+            if (sel && sel.value === '針') step = 14;
         }
         let val = parseFloat(target.value) || 0;
         target.value = Math.max(0, e.deltaY < 0 ? val + step : val - step);
+
+        // ★ここを追加：ホイール操作の後にも行の表示チェックを走らせる
+        checkNextRow();
+        
     }, { passive: false });
 </script>
 </body>
