@@ -274,11 +274,31 @@
     function buildDropdowns(data) {
         for (let l = 1; l <= 5; l++) {
             const select = document.getElementById(`kusuriselect${l}`);
-            let options = `<option>------</option><option>針</option>`;
+            let options = `<option>---</option><option>針</option>`;
             data.forEach(item => {
                 if(item[0]) options += `<option>${item[0]}</option>`;
             });
             select.innerHTML = options;
+
+            // ★追加：プルダウン内をホイールで回せるようにする
+            select.addEventListener('wheel', (e) => {
+                e.preventDefault(); // 画面全体のスクロールを止める
+                
+                if (e.deltaY > 0) {
+                    // 下に回した時：次の項目へ
+                    if (select.selectedIndex < select.options.length - 1) {
+                        select.selectedIndex++;
+                    }
+                } else {
+                    // 上に回した時：前の項目へ
+                    if (select.selectedIndex > 0) {
+                        select.selectedIndex--;
+                    }
+                }
+                
+                // 変更を確定させるためにchangeイベントを発生させる（必要に応じて）
+                select.dispatchEvent(new Event('change'));
+            }, { passive: false });
         }
     }
 
